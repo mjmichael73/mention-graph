@@ -1,8 +1,8 @@
 services:
 
-  mention-graph-db:
+  db:
     image: postgres:15
-    container_name: mention-graph-db
+    container_name: mentions-graph-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -10,13 +10,54 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - mention-graph-db-data:/var/lib/postgresql/data
+      - mentions-graph-db-data:/var/lib/postgresql/data
     networks:
-      - mention-graph-net
+      - mentions-graph-net
 
+  redis:
+    image: redis:latest
+    container_name: mentions-graph-redis
+    ports:
+      - "6379:6379"
+    command: [ "redis-server", "--appendonly", "yes", "--appendfsync", "everysec" ]
+    networks:
+      - mentions-graph-net
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mentions-graph-app
+    ports:
+      - "8000:8000"
+    env_file: "./backend/.env"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+    networks:
+      - mentions-graph-net
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mentions-graph-celery-worker
+    env_file: "./backend/.env"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+      - app
+    command: celery -A app.celery_app worker --loglevel=info --queues mentions
+    networks:
+      - mentions-graph-net
 volumes:
-  mention-graph-db-data:
+  mentions-graph-db-data:
+
 
 networks:
-  mention-graph-net:
+  mentions-graph-net:
     driver: bridge
