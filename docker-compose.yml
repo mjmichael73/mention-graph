@@ -1,0 +1,22 @@
+services:
+
+  mention-graph-db:
+    image: postgres:15
+    container_name: mention-graph-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mention_graph_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - mention-graph-db-data:/var/lib/postgresql/data
+    networks:
+      - mention-graph-net
+
+volumes:
+  mention-graph-db-data:
+
+networks:
+  mention-graph-net:
+    driver: bridge
