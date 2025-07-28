@@ -2,18 +2,16 @@ from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, UniqueCons
 from sqlalchemy.sql import func
 from app.database import Base
 
-
 class Node(Base):
     __tablename__ = "nodes"
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     username = Column(String, nullable=False, index=True, unique=True)
 
-
 class Edge(Base):
     __tablename__ = "edges"
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    source_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
-    target_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
+    source_id = Column(Integer, ForeignKey("nodes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    target_id = Column(Integer, ForeignKey("nodes.id", ondelete="RESTRICT"), nullable=False, index=True)
     weight = Column(Integer, nullable=False, default=1)
     last_updated = Column(
         DateTime(timezone=True),

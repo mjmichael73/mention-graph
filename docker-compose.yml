@@ -50,13 +50,13 @@ services:
       - db
       - redis
       - app
-    command: celery -A app.celery_app worker --loglevel=info --queues mentions --concurrency=4
+    command: celery -A app.celery_app worker --loglevel=info --queues mentions --concurrency=1
     deploy:
-      replicas: 3
+      replicas: 10
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '1'
+          memory: 1024M
     networks:
       - mentions-graph-net
 volumes:
