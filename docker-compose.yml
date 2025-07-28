@@ -43,7 +43,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: mentions-graph-celery-worker
     env_file: "./backend/.env"
     volumes:
       - ./backend:/app
@@ -51,7 +50,13 @@ services:
       - db
       - redis
       - app
-    command: celery -A app.celery_app worker --loglevel=info --queues mentions
+    command: celery -A app.celery_app worker --loglevel=info --queues mentions --concurrency=4
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     networks:
       - mentions-graph-net
 volumes:
