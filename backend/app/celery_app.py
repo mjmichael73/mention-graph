@@ -1,7 +1,11 @@
 from celery import Celery
 import os
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://mentions-graph-redis:6379/0")
+
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://mentions-graph-redis-master:6379/0",
+)
 
 celery = Celery(
     "tasks",

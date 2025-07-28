@@ -1,12 +1,6 @@
 from fastapi import FastAPI, UploadFile, File
 import csv
-import os
-import redis
 from app.tasks import sync_mentions_to_db
-
-
-REDIS_URL = os.environ.get("REDIS_URL", "redis://mentions-graph-redis:6379/0")
-redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
 
 
 app = FastAPI(title="Efficient Mention Graph Storage")
