@@ -1,91 +1,107 @@
-  services:
+services:
 
-    db:
-      image: postgres:15
-      container_name: mentions-graph-db
-      environment:
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: password
-        POSTGRES_DB: mention_graph_db
-      ports:
-        - "5432:5432"
-      volumes:
-        - mentions-graph-db-data:/var/lib/postgresql/data
-      healthcheck:
-        test: ["CMD", "pg_isready", "-U", "postgres"]
-        interval: 5s
-        timeout: 3s
-        retries: 5
-      networks:
-        - mentions-graph-net
+  db:
+    image: postgres:15
+    container_name: mentions-graph-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mention_graph_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - mentions-graph-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - mentions-graph-net
 
-    redis:
-      image: redis:7-alpine
-      container_name: mentions-graph-redis-master
-      command: ["redis-server", "--appendonly", "yes"]
-      ports:
-        - "6379:6379"
-      healthcheck:
-        test: ["CMD", "redis-cli", "ping"]
-        interval: 5s
-        retries: 5
-      networks:
-        - mentions-graph-net
+  redis:
+    image: redis:7-alpine
+    container_name: mentions-graph-redis-master
+    command: [ "redis-server", "--appendonly", "yes" ]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      retries: 5
+    networks:
+      - mentions-graph-net
 
-    app:
-      build:
-        context: ./backend
-        dockerfile: Dockerfile
-      container_name: mentions-graph-app
-      env_file: "./backend/.env"
-      volumes:
-        - ./backend:/app
-      depends_on:
-        db:
-          condition: service_healthy
-        redis:
-          condition: service_healthy
-      networks:
-        - mentions-graph-net
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mentions-graph-app
+    env_file: "./backend/.env"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mentions-graph-net
 
-    celery:
-      build:
-        context: ./backend
-        dockerfile: Dockerfile
-      env_file: "./backend/.env"
-      volumes:
-        - ./backend:/app
-      depends_on:
-        db:
-          condition: service_healthy
-        redis:
-          condition: service_healthy
-      command: celery -A app.celery_app worker --loglevel=info --queues mentions --concurrency=1
-      deploy:
-        replicas: 2
-        resources:
-          limits:
-            cpus: '1'
-            memory: 1024M
-      networks:
-        - mentions-graph-net
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: "./backend/.env"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.celery_app worker --loglevel=info --queues mentions --concurrency=1
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1024M
+    networks:
+      - mentions-graph-net
 
-    nginx:
-      image: nginx:alpine
-      container_name: mentions-graph-nginx
-      ports:
-        - "80:80"
-      volumes:
-        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      depends_on:
-        - app
-      networks:
-        - mentions-graph-net
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: "./backend/.env"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.celery_app beat --loglevel=info
+    networks:
+      - mentions-graph-net
 
-  volumes:
-    mentions-graph-db-data:
+  nginx:
+    image: nginx:alpine
+    container_name: mentions-graph-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - mentions-graph-net
+
+volumes:
+  mentions-graph-db-data:
 
 
-  networks:
-    mentions-graph-net:
-      driver: bridge
+networks:
+  mentions-graph-net:
+    driver: bridge

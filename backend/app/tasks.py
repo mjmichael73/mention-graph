@@ -1,7 +1,7 @@
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 import redis
@@ -11,6 +11,8 @@ from app.models import Edge, Node
 from sqlalchemy.dialects.postgresql import insert
 from itertools import islice
 from sqlalchemy.sql import text
+from celery import shared_task
+
 
 # Configure SQLAlchemy logger
 sqlalchemy_logger = logging.getLogger("sqlalchemy.engine")
@@ -132,3 +134,50 @@ def sync_mentions_to_db(self, rows):
             logger.warning(
                 f"Task {self.request.id}: Error closing database session: {str(e)}"
             )
+
+
+@shared_task
+def decrease_old_edge_weights():
+    session = SessionLocal()
+    try:
+        # Lock table to avoid race conditions with other writes
+        session.execute(text("LOCK TABLE edges IN ROW EXCLUSIVE MODE"))
+
+        # Determine cutoff date
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+
+        while True:
+            # Select batch
+            rows = session.execute(
+                text("""
+                    SELECT id, weight
+                    FROM edges
+                    WHERE last_updated < :cutoff
+                      AND weight > 0
+                    LIMIT :batch_size
+                    FOR UPDATE SKIP LOCKED
+                """),
+                {"cutoff": cutoff_date, "batch_size": 500},
+            ).fetchall()
+
+            if not rows:
+                break  # No more edges to process
+
+            # Update batch
+            ids = [row.id for row in rows]
+            session.execute(
+                text("""
+                    UPDATE edges
+                    SET weight = weight - 1,
+                        last_updated = NOW()
+                    WHERE id = ANY(:ids)
+                """),
+                {"ids": ids},
+            )
+            session.commit()
+
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
