@@ -19,19 +19,86 @@ services:
     networks:
       - mentions-graph-net
 
-  redis:
-    image: redis:7-alpine
-    container_name: mentions-graph-redis-master
-    command: [ "redis-server", "--appendonly", "yes" ]
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 5s
-      retries: 5
+  redis-master:
+    image: redis:latest
+    command: ["redis-server", "--appendonly", "yes", "--protected-mode", "no"]
     networks:
       - mentions-graph-net
 
+  redis-slave-1:
+    image: redis:latest
+    depends_on:
+      - redis-master
+    command: ["redis-server", "--replicaof", "redis-master", "6379", "--protected-mode", "no"]
+    networks:
+      - mentions-graph-net
+
+  redis-slave-2:
+    image: redis:latest
+    depends_on:
+      - redis-master
+    command: ["redis-server", "--replicaof", "redis-master", "6379", "--protected-mode", "no"]
+    networks:
+      - mentions-graph-net
+
+  redis-slave-3:
+    image: redis:latest
+    depends_on:
+      - redis-master
+    command: ["redis-server", "--replicaof", "redis-master", "6379", "--protected-mode", "no"]
+    networks:
+      - mentions-graph-net
+
+  sentinel-1:
+    image: redis:latest
+    depends_on:
+      - redis-master
+      - redis-slave-1
+      - redis-slave-2
+      - redis-slave-3
+    command: >
+      sh -c 'echo "sentinel resolve-hostnames yes" > /etc/sentinel.conf &&
+            echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
+            echo "sentinel down-after-milliseconds mymaster 1000" >> /etc/sentinel.conf &&
+            echo "sentinel failover-timeout mymaster 5000" >> /etc/sentinel.conf &&
+            echo "sentinel parallel-syncs mymaster 1" >> /etc/sentinel.conf &&
+            redis-server /etc/sentinel.conf --sentinel'
+    networks:
+      - mentions-graph-net
+
+  sentinel-2:
+    image: redis:latest
+    depends_on:
+      - redis-master
+      - redis-slave-1
+      - redis-slave-2
+      - redis-slave-3
+    command: >
+      sh -c 'echo "sentinel resolve-hostnames yes" > /etc/sentinel.conf &&
+            echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
+            echo "sentinel down-after-milliseconds mymaster 1000" >> /etc/sentinel.conf &&
+            echo "sentinel failover-timeout mymaster 5000" >> /etc/sentinel.conf &&
+            echo "sentinel parallel-syncs mymaster 1" >> /etc/sentinel.conf &&
+            redis-server /etc/sentinel.conf --sentinel'
+    networks:
+      - mentions-graph-net
+
+  sentinel-3:
+    image: redis:latest
+    depends_on:
+      - redis-master
+      - redis-slave-1
+      - redis-slave-2
+      - redis-slave-3
+    command: >
+      sh -c 'echo "sentinel resolve-hostnames yes" > /etc/sentinel.conf &&
+            echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
+            echo "sentinel down-after-milliseconds mymaster 1000" >> /etc/sentinel.conf &&
+            echo "sentinel failover-timeout mymaster 5000" >> /etc/sentinel.conf &&
+            echo "sentinel parallel-syncs mymaster 1" >> /etc/sentinel.conf &&
+            redis-server /etc/sentinel.conf --sentinel'
+    networks:
+      - mentions-graph-net
   app:
     build:
       context: ./backend
@@ -41,10 +108,14 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - db
+      - redis-master
+      - redis-slave-1
+      - redis-slave-2
+      - redis-slave-3
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
     networks:
       - mentions-graph-net
 
@@ -56,10 +127,14 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - db
+      - redis-master
+      - redis-slave-1
+      - redis-slave-2
+      - redis-slave-3
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
     command: celery -A app.celery_app worker --loglevel=info --queues mentions --concurrency=1
     deploy:
       replicas: 2
@@ -78,10 +153,14 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - db
+      - redis-master
+      - redis-slave-1
+      - redis-slave-2
+      - redis-slave-3
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
     command: celery -A app.celery_app beat --loglevel=info
     networks:
       - mentions-graph-net

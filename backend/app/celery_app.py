@@ -1,20 +1,35 @@
 from celery import Celery
-from celery.schedules import crontab
+from celery.schedules import crontab  # noqa: F401
 import os
 
 
-REDIS_URL = os.getenv(
-    "REDIS_URL",
-    "redis://mentions-graph-redis-master:6379/0",
-)
+BROKER_URL = os.getenv("BROKER_URL", "sentinel://sentinel-1:26379;sentinel-2:26379;sentinel-3:26379/0?master_name=mymaster")
+BROKER_MASTER = os.getenv("BROKER_URL", "mymaster")
 
 celery = Celery(
     "tasks",
-    broker=REDIS_URL,
-    backend=REDIS_URL,
+    broker=BROKER_URL,
+    backend=BROKER_URL,
     include=["app.tasks"],
 )
-celery.conf.task_routes = {"app.tasks.*": {"queue": "mentions"}}
+
+
+celery.conf.update(
+    broker_transport_options={
+        "master_name": BROKER_MASTER,
+        "sentinel_kwargs": {
+            "password": None,
+        },
+    },
+    result_backend_transport_options={
+        "master_name": BROKER_MASTER,
+        "sentinel_kwargs": {
+            "password": None,
+        },
+        "visibility_timeout": 3600,  # 1 hour
+    },
+    task_routes={"app.tasks.*": {"queue": "mentions"}},
+)
 
 
 celery.conf.beat_schedule = {
