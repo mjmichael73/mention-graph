@@ -22,6 +22,7 @@ services:
   redis-master:
     image: redis:latest
     command: ["redis-server", "--appendonly", "yes", "--protected-mode", "no"]
+    restart: always
     networks:
       - mentions-graph-net
 
@@ -29,6 +30,7 @@ services:
     image: redis:latest
     depends_on:
       - redis-master
+    restart: always
     command: ["redis-server", "--replicaof", "redis-master", "6379", "--protected-mode", "no"]
     networks:
       - mentions-graph-net
@@ -37,6 +39,7 @@ services:
     image: redis:latest
     depends_on:
       - redis-master
+    restart: always
     command: ["redis-server", "--replicaof", "redis-master", "6379", "--protected-mode", "no"]
     networks:
       - mentions-graph-net
@@ -45,6 +48,7 @@ services:
     image: redis:latest
     depends_on:
       - redis-master
+    restart: always
     command: ["redis-server", "--replicaof", "redis-master", "6379", "--protected-mode", "no"]
     networks:
       - mentions-graph-net
@@ -56,6 +60,7 @@ services:
       - redis-slave-1
       - redis-slave-2
       - redis-slave-3
+    restart: always
     command: >
       sh -c 'echo "sentinel resolve-hostnames yes" > /etc/sentinel.conf &&
             echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
@@ -73,6 +78,7 @@ services:
       - redis-slave-1
       - redis-slave-2
       - redis-slave-3
+    restart: always
     command: >
       sh -c 'echo "sentinel resolve-hostnames yes" > /etc/sentinel.conf &&
             echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
@@ -90,6 +96,7 @@ services:
       - redis-slave-1
       - redis-slave-2
       - redis-slave-3
+    restart: always
     command: >
       sh -c 'echo "sentinel resolve-hostnames yes" > /etc/sentinel.conf &&
             echo "sentinel monitor mymaster redis-master 6379 2" >> /etc/sentinel.conf &&
@@ -107,6 +114,7 @@ services:
     env_file: "./backend/.env"
     volumes:
       - ./backend:/app
+    restart: always
     depends_on:
       - db
       - redis-master
@@ -135,6 +143,7 @@ services:
       - sentinel-1
       - sentinel-2
       - sentinel-3
+    restart: always
     command: celery -A app.celery_app worker --loglevel=info --queues mentions --concurrency=1
     deploy:
       replicas: 2
@@ -162,6 +171,7 @@ services:
       - sentinel-2
       - sentinel-3
     command: celery -A app.celery_app beat --loglevel=info
+    restart: always
     networks:
       - mentions-graph-net
 
@@ -174,6 +184,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - app
+    restart: always
     networks:
       - mentions-graph-net
 
